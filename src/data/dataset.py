@@ -4,7 +4,7 @@
 import os
 from torchvision import datasets
 from torch.utils.data import DataLoader
-from augmentation import get_train_transform  # Make sure both files are in the same folder
+from .augmentation import get_train_transform  # Make sure both files are in the same folder
 
 def get_mvtec_dataloader(category="bottle", batch_size=32, image_size=256, shuffle=True, num_workers=4):
     # Project root: 3 levels up from src/data/

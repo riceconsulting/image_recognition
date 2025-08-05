@@ -14,10 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application's source code and models
 # This includes the src, models, and config directories
-COPY ./src ./src
-COPY ./models ./models
-COPY ./config ./config
-COPY ./app ./app
+COPY . .
 
 # Expose the port that the API will run on. FastAPI typically uses 8000.
 EXPOSE 8000
@@ -25,4 +22,4 @@ EXPOSE 8000
 # Define the command to run the application
 # This starts the FastAPI backend service using uvicorn server
 # The entry point is the 'app' object in 'app/main.py' [cite: 65, 66]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

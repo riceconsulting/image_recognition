@@ -1,9 +1,10 @@
-# augmentation.py
+# src/data/augmentation.py
 # Data augmentation functions using torchvision.transforms
 
 from torchvision import transforms
 
 def get_train_transform(image_size=256):
+    """Returns the transformations for training data."""
     return transforms.Compose([
         transforms.Resize((image_size, image_size)),
         transforms.RandomHorizontalFlip(),
@@ -13,7 +14,19 @@ def get_train_transform(image_size=256):
         transforms.Normalize(mean=[0.5]*3, std=[0.5]*3),
     ])
 
+def get_validation_transforms(image_size=256):
+    """
+    Returns the transformations for validation data.
+    Typically, this is the same as the test transform: no random augmentations.
+    """
+    return transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3),
+    ])
+
 def get_test_transform(image_size=256):
+    """Returns the transformations for test data."""
     return transforms.Compose([
         transforms.Resize((image_size, image_size)),
         transforms.ToTensor(),

@@ -1,0 +1,52 @@
+
+###
+
+# --- Test a "contamination" image ---
+POST http://127.0.0.1:8000/predict/
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="contamination_000.png"
+Content-Type: image/png
+
+< data/processed/bottle/test/contamination/000.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+
+# --- Test a "good" image ---
+POST http://127.0.0.1:8000/predict/
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="good_000.png"
+Content-Type: image/png
+
+< data/processed/bottle/test/good/000.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+
+# --- Test a "broken_large" image ---
+POST http://127.0.0.1:8000/predict/
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="broken_large_000.png"
+Content-Type: image/png
+
+< data/processed/bottle/test/broken_large/000.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+
+# --- Test a "broken_small" image ---
+POST http://127.0.0.1:8000/predict/
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="broken_small_000.png"
+Content-Type: image/png
+
+< data/processed/bottle/test/broken_small/000.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
