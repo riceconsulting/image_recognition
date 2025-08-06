@@ -1,59 +1,51 @@
 # src/core/inference_engine.py
 import torch
 from PIL import Image
-from src.models.build_model import build_defect_detection_model
-from src.data.augmentation import get_validation_transforms
+import os
+import torchvision.transforms as transforms
+import numpy as np
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+import sys
+sys.path.insert(0, project_root)
+
+from src.models.build_model import build_segmentation_model
+from src.core.post_processing import process_segmentation_output, overlay_mask_on_image
 
 class InferenceEngine:
-    """
-    A class to handle loading the model and running inference.
-    """
     def __init__(self, model_path, config):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # Build the model architecture
-        self.model = build_defect_detection_model(config['model_config'])
-        
-        # Load the trained weights
+        self.model = build_segmentation_model(config['model_config'])
+        print(f"Loading model from: {model_path}")
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.to(self.device)
-        self.model.eval() # Set the model to evaluation mode
-        
-        self.transform = get_validation_transforms()
-        self.class_names = ['good', 'defect'] # Should match your training labels
+        self.model.eval()
+
+        # Simple transform for inference: resize, to tensor, normalize
+        self.transform = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
 
     def predict(self, image: Image.Image):
-        """
-        Takes a PIL image and returns a prediction.
-        """
-        # Pre-process the image
-        image_tensor = self.transform(image).unsqueeze(0).to(self.device)
+        original_image = image.copy()
+        image_tensor = self.transform(original_image).unsqueeze(0).to(self.device)
         
-        # Perform inference
         with torch.no_grad():
-            outputs = self.model(image_tensor)
+            output = self.model(image_tensor)
             
-        # Post-process the output
-        probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
-        confidence, predicted_class_idx = torch.max(probabilities, 0)
+        binary_mask = process_segmentation_output(output)
         
-        predicted_class_name = self.class_names[predicted_class_idx.item()]
+        # Check if any defect was detected
+        defect_detected = bool(np.sum(binary_mask) > 0)
+        
+        # Create an image with the mask overlaid for visualization
+        overlayed_image = overlay_mask_on_image(original_image, binary_mask)
         
         return {
-            "class_name": predicted_class_name,
-            "confidence": confidence.item()
+            "defect_detected": defect_detected,
+            "mask": binary_mask.tolist(), # Send mask as a list
+            "overlay_image": overlayed_image # This would be converted to base64 to send via API
         }
-
-# --- Example Usage (not part of the final app) ---
-if __name__ == '__main__':
-    # This is how you would initialize and use the engine
-    CONFIG = {
-        'model_config': {'num_classes': 2, 'pretrained': False} # pretrained doesn't matter for loading
-    }
-    engine = InferenceEngine(model_path='models/final/defect_detector_v1.pth', config=CONFIG)
-    
-    # Create a dummy image to test
-    dummy_image = Image.new('RGB', (224, 224), color = 'red')
-    
-    prediction = engine.predict(dummy_image)
-    print(f"Prediction: {prediction}")

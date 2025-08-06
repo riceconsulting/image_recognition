@@ -1,34 +1,47 @@
 # src/data/augmentation.py
-# Data augmentation functions using torchvision.transforms
-
+import torch
 from torchvision import transforms
+import random
+from PIL import Image
 
-def get_train_transform(image_size=256):
-    """Returns the transformations for training data."""
-    return transforms.Compose([
-        transforms.Resize((image_size, image_size)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3),
-    ])
-
-def get_validation_transforms(image_size=256):
+class SegmentationTransform:
     """
-    Returns the transformations for validation data.
-    Typically, this is the same as the test transform: no random augmentations.
+    A callable class to apply transformations to an image and its mask for segmentation.
+    This structure is compatible with PyTorch's multiprocessing for data loading.
     """
-    return transforms.Compose([
-        transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3),
-    ])
+    def __init__(self, image_size=256, is_train=True):
+        self.image_size = image_size
+        self.is_train = is_train
+        self.resize = transforms.Resize(size=(image_size, image_size))
+        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-def get_test_transform(image_size=256):
-    """Returns the transformations for test data."""
-    return transforms.Compose([
-        transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3),
-    ])
+    def __call__(self, image, mask):
+        # Resize
+        image = self.resize(image)
+        mask = self.resize(mask)
+
+        # Apply random augmentations only if it's the training set
+        if self.is_train:
+            # Random horizontal flipping
+            if random.random() > 0.5:
+                image = transforms.functional.hflip(image)
+                mask = transforms.functional.hflip(mask)
+
+            # Random vertical flipping
+            if random.random() > 0.5:
+                image = transforms.functional.vflip(image)
+                mask = transforms.functional.vflip(mask)
+            
+            # Random rotation
+            angle = random.choice([0, 90, 180, 270])
+            image = transforms.functional.rotate(image, angle)
+            mask = transforms.functional.rotate(mask, angle)
+
+        # Transform to tensor
+        image = transforms.functional.to_tensor(image)
+        mask = transforms.functional.to_tensor(mask)
+
+        # Normalize image
+        image = self.normalize(image)
+        
+        return image, mask
