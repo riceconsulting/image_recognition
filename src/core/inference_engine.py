@@ -9,14 +9,15 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 import sys
 sys.path.insert(0, project_root)
 
-from src.models.build_model import build_segmentation_model
+from src.models.build_model import build_model
 from src.core.post_processing import process_segmentation_output, overlay_mask_on_image
 
 class InferenceEngine:
     def __init__(self, model_path, config):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        self.model = build_segmentation_model(config['model_config'])
+        self.model = build_model(config['model_config'])
+        
         print(f"Loading model from: {model_path}")
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.to(self.device)
@@ -35,6 +36,11 @@ class InferenceEngine:
         
         with torch.no_grad():
             output = self.model(image_tensor)
+
+        # --- FIX ---
+        # Handle the dictionary output from torchvision's DeepLabV3+ model
+        if isinstance(output, dict):
+            output = output['out']
             
         binary_mask = process_segmentation_output(output)
         

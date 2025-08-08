@@ -1,35 +1,39 @@
 # src/app/api.py
-from fastapi import APIRouter, File, UploadFile, BackgroundTasks
+from fastapi import APIRouter, File, UploadFile, BackgroundTasks, Query
 from PIL import Image
 import io
-from .controller import analyze_image, start_model_training
+from . import controller
+from typing import Literal
 
-# Create a new router object. All endpoints will be attached to this.
+# Create a new router object
 router = APIRouter()
 
 @router.get("/")
 def read_root():
-    """Defines the root endpoint."""
-    return {"message": "Welcome to the Defect Detection API. Use '/predict' to analyze an image or '/train' to start model training."}
+    return {"message": "Welcome to the Defect Detection API."}
 
 @router.post("/predict/")
-async def predict(file: UploadFile = File(...)):
+async def predict(
+    image_file: UploadFile = File(..., description="The image to analyze."),
+    model_arch: Literal['unet', 'deeplabv3plus'] = Query('unet', description="The model architecture to use for prediction.")
+):
     """
-    Prediction endpoint. Receives an image file and returns the prediction.
-    The logic is handled by the controller.
+    Prediction endpoint. Receives an image and a model choice, returns the analysis.
     """
-    contents = await file.read()
+    contents = await image_file.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
     
-    prediction = analyze_image(image)
+    prediction = controller.analyze_image(image, model_architecture=model_arch)
     
     return prediction
 
 @router.post("/train/")
-async def train(background_tasks: BackgroundTasks):
+async def train(
+    background_tasks: BackgroundTasks,
+    model_arch: Literal['unet', 'deeplabv3plus'] = Query('unet', description="The model architecture to train.")
+):
     """
-    Training endpoint. Triggers the model training process in the background.
-    The logic is handled by the controller.
+    Training endpoint. Triggers the training process for a specific model in the background.
     """
-    background_tasks.add_task(start_model_training)
-    return {"message": "Model training started in the background. This may take some time. The new model will be active once training is complete."}
+    background_tasks.add_task(controller.start_model_training, model_architecture=model_arch)
+    return {"message": f"Model training for '{model_arch}' started in the background."}

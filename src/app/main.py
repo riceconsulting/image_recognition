@@ -1,7 +1,8 @@
 # src/app/main.py
 from fastapi import FastAPI
 from .api import router
-from .controller import get_inference_engine
+# The controller is no longer needed for the startup event
+# from .controller import get_inference_engine 
 
 # Initialize the FastAPI app
 app = FastAPI(title="Industrial Defect Detection API")
@@ -9,12 +10,12 @@ app = FastAPI(title="Industrial Defect Detection API")
 @app.on_event("startup")
 def startup_event():
     """
-    On startup, this will initialize the inference engine so the first
-    prediction is fast.
+    Application startup event. The inference engine will be loaded on the first
+    prediction request instead of here.
     """
     print("--- Application Startup ---")
-    get_inference_engine()
-    print("--- API is ready ---")
+    # The get_inference_engine() call is removed to fix the error.
+    print("--- API is ready. Inference engines will be loaded on demand. ---")
 
 # Include the router from api.py
 # All endpoints defined in api.py will now be part of the main app.

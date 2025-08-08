@@ -1,0 +1,39 @@
+# config/config.yaml
+
+# General project settings
+product_name: 'bottle'
+# Choose which segmentation model architecture to use: 'unet' or 'deeplabv3plus'
+active_model_architecture: 'unet' 
+
+# --- Model Configurations ---
+
+unet:
+  model_config:
+    model_type: 'segmentation'
+    architecture: 'unet'
+    n_classes: 1
+    n_channels: 3
+  train_params:
+    learning_rate: 0.0001
+    batch_size: 8
+    num_epochs: 50
+    patience: 5
+  paths:
+    best_model: 'models/final/best_unet_model.pth'
+    checkpoint: 'models/checkpoints/latest.pth'
+
+deeplabv3plus:
+  model_config:
+    model_type: 'segmentation'
+    architecture: 'deeplabv3plus'
+    num_classes: 1 # Output classes (1 for binary mask)
+    output_stride: 16
+    pretrained: true
+  train_params:
+    learning_rate: 0.001
+    batch_size: 4 # DeepLabV3+ is larger, so a smaller batch size is often needed
+    num_epochs: 50
+    patience: 5
+  paths:
+    best_model: 'models/final/best_deeplabv3_model.pth'
+    checkpoint: 'models/checkpoints/latest_deeplabv3.pth'

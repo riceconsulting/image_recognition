@@ -1,14 +1,30 @@
 # src/models/build_model.py
-from src.models.model_architectures import UNet
+from .model_architectures import UNet, get_deeplabv3plus
 
-def build_segmentation_model(config):
+def build_model(config):
     """
-    Builds the U-Net segmentation model.
-    """
-    n_channels = config.get('n_channels', 3)
-    n_classes = config.get('n_classes', 1) # For binary segmentation (defect vs. background)
-
-    print(f"Building U-Net model for {n_classes} output class(es)...")
-    model = UNet(n_channels=n_channels, n_classes=n_classes)
+    Builds the appropriate segmentation model based on the configuration.
     
-    return model
+    Args:
+        config (dict): The model-specific configuration dictionary.
+    
+    Returns:
+        A PyTorch model instance.
+    """
+    architecture = config.get('architecture')
+    
+    if architecture == 'unet':
+        print("Building Segmentation Model (U-Net)...")
+        return UNet(
+            n_channels=config.get('n_channels', 3),
+            n_classes=config.get('n_classes', 1)
+        )
+    elif architecture == 'deeplabv3plus':
+        print("Building Segmentation Model (DeepLabV3+)...")
+        return get_deeplabv3plus(
+            num_classes=config.get('num_classes', 1),
+            output_stride=config.get('output_stride', 16),
+            pretrained=config.get('pretrained', True)
+        )
+    else:
+        raise ValueError(f"Unknown model architecture: {architecture}")
