@@ -4,6 +4,7 @@ from PIL import Image
 import os
 import torchvision.transforms as transforms
 import numpy as np
+import time
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 import sys
@@ -15,7 +16,6 @@ from src.core.post_processing import process_segmentation_output, overlay_mask_o
 class InferenceEngine:
     def __init__(self, model_path, config):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
         self.model = build_model(config['model_config'])
         
         print(f"Loading model from: {model_path}")
@@ -23,7 +23,6 @@ class InferenceEngine:
         self.model.to(self.device)
         self.model.eval()
 
-        # Simple transform for inference: resize, to tensor, normalize
         self.transform = transforms.Compose([
             transforms.Resize((256, 256)),
             transforms.ToTensor(),
@@ -34,24 +33,37 @@ class InferenceEngine:
         original_image = image.copy()
         image_tensor = self.transform(original_image).unsqueeze(0).to(self.device)
         
+        # --- 1. Measure Inference Speed ---
+        start_time = time.perf_counter()
         with torch.no_grad():
             output = self.model(image_tensor)
+        end_time = time.perf_counter()
+        inference_time_ms = (end_time - start_time) * 1000
 
-        # --- FIX ---
-        # Handle the dictionary output from torchvision's DeepLabV3+ model
         if isinstance(output, dict):
             output = output['out']
             
-        binary_mask = process_segmentation_output(output)
+        # --- 2. Calculate Confidence Score ---
+        probabilities = torch.sigmoid(output)
+        binary_mask_tensor = (probabilities > 0.5)
         
-        # Check if any defect was detected
+        # Calculate confidence only for the pixels predicted as defects
+        defect_pixels = probabilities[binary_mask_tensor]
+        confidence_score = defect_pixels.mean().item() if len(defect_pixels) > 0 else 0.0
+
+        # Convert to numpy for post-processing
+        binary_mask = binary_mask_tensor.cpu().numpy().squeeze().astype(np.uint8)
+        
         defect_detected = bool(np.sum(binary_mask) > 0)
         
-        # Create an image with the mask overlaid for visualization
         overlayed_image = overlay_mask_on_image(original_image, binary_mask)
         
         return {
             "defect_detected": defect_detected,
-            "mask": binary_mask.tolist(), # Send mask as a list
-            "overlay_image": overlayed_image # This would be converted to base64 to send via API
+            "overlay_image": overlayed_image,
+            "confidence": confidence_score,
+            "inference_time_ms": inference_time_ms,
+            # Note: Metrics like IoU/Dice require a ground truth mask,
+            # which is not available during live prediction.
+            # They are calculated in the evaluate.py script.
         }

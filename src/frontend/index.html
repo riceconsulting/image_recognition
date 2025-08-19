@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Industrial Defect Detection</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .result-image { max-width: 100%; height: auto; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .example-image-container { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .example-image-container:hover { transform: scale(1.05); box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2); }
+        .nav-card { transition: background-color 0.2s, transform 0.2s; }
+        .nav-card:hover { background-color: #374151; transform: translateY(-5px); }
+        .page { display: none; }
+        .page.active { display: block; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-gray-200 min-h-screen flex flex-col items-center p-4 sm:p-8">
+
+    <div class="w-full max-w-5xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-bold text-white mb-2">Industrial Defect Detection</h1>
+            <p id="header-subtitle" class="text-lg text-gray-400">Main Menu</p>
+        </header>
+
+        <!-- Main Menu Page -->
+        <div id="main-menu-page" class="page active">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div id="go-to-train" class="nav-card bg-gray-800 p-8 rounded-lg shadow-2xl text-center cursor-pointer">
+                    <h2 class="text-3xl font-bold text-white mb-4">Train Model</h2>
+                    <p class="text-gray-400">Train a new segmentation model on a selected dataset.</p>
+                </div>
+                <div id="go-to-predict" class="nav-card bg-gray-800 p-8 rounded-lg shadow-2xl text-center cursor-pointer">
+                    <h2 class="text-3xl font-bold text-white mb-4">Predict Defects</h2>
+                    <p class="text-gray-400">Upload an image to find defects using a trained model.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Training Page -->
+        <div id="train-page" class="page">
+            <main class="bg-gray-800 p-6 rounded-lg shadow-2xl">
+                <button class="back-btn mb-6 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">&larr; Back to Menu</button>
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+                    <div class="w-full flex flex-col sm:flex-row gap-4">
+                        <select id="train-model-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg w-full p-2.5">
+                            <option value="unet" selected>U-Net</option>
+                            <option value="deeplabv3plus">DeepLabV3+</option>
+                        </select>
+                        <select id="train-dataset-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg w-full p-2.5"></select>
+                    </div>
+                    <button id="train-btn" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg w-full sm:w-auto flex-shrink-0">Start Training</button>
+                </div>
+                <div id="training-output" class="text-center py-12 border-2 border-dashed border-gray-600 rounded-lg">
+                    <p class="text-gray-500">Training status will appear here.</p>
+                </div>
+            </main>
+        </div>
+
+        <!-- Prediction Page -->
+        <div id="predict-page" class="page">
+             <main class="bg-gray-800 p-6 rounded-lg shadow-2xl">
+                <button class="back-btn mb-6 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">&larr; Back to Menu</button>
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+                    <div class="flex items-center gap-4">
+                        <div>
+                            <label for="predict-model-select" class="block text-sm font-medium text-gray-300 mb-1">Select Model</label>
+                            <select id="predict-model-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg w-full p-2.5">
+                                <option value="unet" selected>U-Net</option>
+                                <option value="deeplabv3plus">DeepLabV3+</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="predict-dataset-select" class="block text-sm font-medium text-gray-300 mb-1">Select Dataset</label>
+                            <select id="predict-dataset-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg w-full p-2.5"></select>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <input type="file" id="image-upload" class="hidden" accept="image/png, image/jpeg">
+                        <label for="image-upload" class="cursor-pointer bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Upload Image</label>
+                        <button id="predict-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg">Predict</button>
+                    </div>
+                </div>
+                <div id="results-container" class="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[300px] items-start hidden">
+                    <div class="text-center">
+                        <h3 class="text-xl font-semibold mb-2 text-white">Original Image</h3>
+                        <img id="original-image" src="" alt="Original" class="result-image mx-auto">
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-xl font-semibold mb-2 text-white">Prediction Result</h3>
+                        <img id="predicted-image" src="" alt="Prediction" class="result-image mx-auto">
+                        <p id="prediction-status" class="mt-2 text-lg font-medium"></p>
+                    </div>
+                </div>
+
+                <!-- Metrics Display -->
+                <div id="metrics-container" class="mt-4 bg-gray-700 p-4 rounded-lg grid grid-cols-1 sm:grid-cols-2 gap-4 hidden">
+                    <div class="text-center">
+                        <h4 class="text-md font-semibold text-gray-400">Confidence Score</h4>
+                        <p id="confidence-score" class="text-2xl font-bold text-white">-</p>
+                    </div>
+                    <div class="text-center">
+                        <h4 class="text-md font-semibold text-gray-400">Inference Time</h4>
+                        <p id="inference-time" class="text-2xl font-bold text-white">-</p>
+                    </div>
+                </div>
+                
+                <div id="loading-spinner" class="text-center py-12 hidden">
+                    <svg class="animate-spin h-10 w-10 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <p class="mt-4 text-lg text-gray-400">Processing image...</p>
+                </div>
+                <div id="placeholder" class="text-center py-20 border-2 border-dashed border-gray-600 rounded-lg">
+                    <p class="text-gray-500">Your results will appear here.</p>
+                </div>
+                <div class="mt-10">
+                    <h3 class="text-2xl font-semibold text-center mb-4 text-white">Or Try an Example</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" id="example-gallery"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // --- Page Navigation and Setup ---
+        const pages = document.querySelectorAll('.page');
+        const headerSubtitle = document.getElementById('header-subtitle');
+        const goToTrainBtn = document.getElementById('go-to-train');
+        const goToPredictBtn = document.getElementById('go-to-predict');
+        const backBtns = document.querySelectorAll('.back-btn');
+        let trainingChart = null;
+
+        function showPage(pageId) {
+            pages.forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            headerSubtitle.textContent = pageId.replace('-page', '').replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+        goToTrainBtn.addEventListener('click', () => showPage('train-page'));
+        goToPredictBtn.addEventListener('click', () => showPage('predict-page'));
+        backBtns.forEach(btn => btn.addEventListener('click', () => showPage('main-menu-page')));
+
+        // --- Training Page Logic ---
+        const trainBtn = document.getElementById('train-btn');
+        const trainModelSelect = document.getElementById('train-model-select');
+        const trainDatasetSelect = document.getElementById('train-dataset-select');
+        const trainingOutput = document.getElementById('training-output');
+        const predictDatasetSelect = document.getElementById('predict-dataset-select');
+
+        async function populateDatasetDropdowns() {
+            try {
+                const response = await fetch('/datasets');
+                const data = await response.json();
+                const datasetSelectors = [trainDatasetSelect, predictDatasetSelect];
+                
+                datasetSelectors.forEach(selector => {
+                    selector.innerHTML = '';
+                    if (data.datasets && data.datasets.length > 0) {
+                        data.datasets.forEach(dataset => {
+                            const option = document.createElement('option');
+                            option.value = dataset;
+                            option.textContent = dataset.charAt(0).toUpperCase() + dataset.slice(1);
+                            selector.appendChild(option);
+                        });
+                    } else {
+                        selector.innerHTML = '<option disabled>No datasets found</option>';
+                    }
+                });
+                if (predictDatasetSelect.value) {
+                    updateExampleImages(predictDatasetSelect.value);
+                }
+            } catch (error) {
+                console.error('Error fetching datasets:', error);
+                [trainDatasetSelect, predictDatasetSelect].forEach(s => s.innerHTML = '<option disabled>Error</option>');
+            }
+        }
+
+        trainBtn.addEventListener('click', async () => {
+            const modelArch = trainModelSelect.value;
+            const dataset = trainDatasetSelect.value;
+            
+            trainingOutput.innerHTML = `<div class="flex justify-center items-center flex-col"><svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="mt-4 text-blue-400">Training model '${modelArch}' on '${dataset}'. This may take several minutes...</p></div>`;
+            if (trainingChart) { trainingChart.destroy(); }
+
+            try {
+                const response = await fetch(`/train/?model_arch=${modelArch}&dataset_name=${dataset}`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayTrainingResults(data.history);
+                } else {
+                    throw new Error(data.message || 'Unknown training error');
+                }
+
+            } catch (error) {
+                console.error('Training error:', error);
+                trainingOutput.innerHTML = `<p class="text-red-400">An error occurred during training. Please check the server logs.</p>`;
+            }
+        });
+
+        function displayTrainingResults(history) {
+            trainingOutput.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-left p-4">
+                    <div class="bg-gray-700 p-4 rounded-lg text-center">
+                        <h4 class="text-lg font-semibold text-gray-400">Total Epochs</h4>
+                        <p class="text-3xl font-bold text-white">${history.total_epochs}</p>
+                    </div>
+                    <div class="bg-gray-700 p-4 rounded-lg text-center">
+                        <h4 class="text-lg font-semibold text-gray-400">Best Val Dice Score</h4>
+                        <p class="text-3xl font-bold text-green-400">${history.best_val_score.toFixed(4)}</p>
+                    </div>
+                     <div class="bg-gray-700 p-4 rounded-lg text-center">
+                        <h4 class="text-lg font-semibold text-gray-400">Final Training Loss</h4>
+                        <p class="text-3xl font-bold text-white">${history.train_loss[history.train_loss.length - 1].toFixed(4)}</p>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <canvas id="training-chart"></canvas>
+                </div>
+            `;
+
+            const ctx = document.getElementById('training-chart').getContext('2d');
+            trainingChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({ length: history.total_epochs }, (_, i) => `Epoch ${i + 1}`),
+                    datasets: [
+                        {
+                            label: 'Training Loss',
+                            data: history.train_loss,
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Validation Dice Score',
+                            data: history.val_dice,
+                            borderColor: 'rgb(16, 185, 129)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Loss' } },
+                        y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Dice Score' }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        // --- Prediction Page Logic & Initial Load ---
+        const predictBtn = document.getElementById('predict-btn');
+        const imageUpload = document.getElementById('image-upload');
+        const predictModelSelect = document.getElementById('predict-model-select');
+        const originalImage = document.getElementById('original-image');
+        const predictedImage = document.getElementById('predicted-image');
+        const predictionStatus = document.getElementById('prediction-status');
+        const resultsContainer = document.getElementById('results-container');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const placeholder = document.getElementById('placeholder');
+        const exampleGallery = document.getElementById('example-gallery');
+        const metricsContainer = document.getElementById('metrics-container');
+        const confidenceScoreEl = document.getElementById('confidence-score');
+        const inferenceTimeEl = document.getElementById('inference-time');
+        let selectedFile = null;
+        
+        predictDatasetSelect.addEventListener('change', (event) => {
+            updateExampleImages(event.target.value);
+        });
+
+        async function updateExampleImages(datasetName) {
+            exampleGallery.innerHTML = '<p class="text-gray-500 col-span-full text-center">Loading examples...</p>';
+            try {
+                const response = await fetch(`/example-images/${datasetName}`);
+                const data = await response.json();
+                exampleGallery.innerHTML = ''; 
+                if (data.images && data.images.length > 0) {
+                    data.images.forEach(example => {
+                        const container = document.createElement('div');
+                        container.className = 'example-image-container rounded-lg overflow-hidden bg-gray-700';
+                        container.onclick = () => selectExample(example.path);
+
+                        const imgElement = document.createElement('img');
+                        imgElement.src = '/' + example.path;
+                        imgElement.className = 'w-full h-auto';
+                        
+                        const textElement = document.createElement('p');
+                        textElement.className = 'text-center text-sm font-medium py-2';
+                        textElement.textContent = example.className;
+
+                        container.appendChild(imgElement);
+                        container.appendChild(textElement);
+                        exampleGallery.appendChild(container);
+                    });
+                } else {
+                    exampleGallery.innerHTML = '<p class="text-gray-500 col-span-full text-center">No examples found for this dataset.</p>';
+                }
+            } catch (error) {
+                console.error('Error fetching example images:', error);
+                exampleGallery.innerHTML = '<p class="text-red-500 col-span-full text-center">Could not load examples.</p>';
+            }
+        }
+        
+        async function selectExample(path) {
+            try {
+                const pathParts = path.split('/');
+                const datasetName = pathParts[2];
+                predictDatasetSelect.value = datasetName;
+
+                const response = await fetch('/' + path);
+                const blob = await response.blob();
+                selectedFile = new File([blob], path.split('/').pop(), { type: blob.type });
+                originalImage.src = URL.createObjectURL(selectedFile);
+                resultsContainer.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                metricsContainer.classList.add('hidden');
+                handlePrediction();
+            } catch (error) {
+                console.error('Error loading example image:', error);
+            }
+        }
+
+        imageUpload.addEventListener('change', (event) => {
+            selectedFile = event.target.files[0];
+            if (selectedFile) {
+                originalImage.src = URL.createObjectURL(selectedFile);
+                resultsContainer.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                metricsContainer.classList.add('hidden');
+            }
+        });
+        
+        predictBtn.addEventListener('click', handlePrediction);
+        
+        async function handlePrediction() {
+            if (!selectedFile) { alert('Please upload an image first!'); return; }
+            const modelArch = predictModelSelect.value;
+            const dataset = predictDatasetSelect.value;
+            const formData = new FormData();
+            formData.append('image_file', selectedFile);
+
+            loadingSpinner.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            placeholder.classList.add('hidden');
+            metricsContainer.classList.add('hidden');
+
+            try {
+                const response = await fetch(`/predict/?model_arch=${modelArch}&dataset_name=${dataset}`, { method: 'POST', body: formData });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                
+                predictedImage.src = `data:image/png;base64,${data.overlay_image_b64}`;
+                predictionStatus.textContent = data.defect_detected ? 'Defect Detected!' : 'No Defect Detected';
+                predictionStatus.className = `mt-2 text-lg font-bold ${data.defect_detected ? 'text-red-400' : 'text-green-400'}`;
+
+                // Update metrics
+                confidenceScoreEl.textContent = data.defect_detected ? `${(data.confidence * 100).toFixed(2)}%` : '-';
+                inferenceTimeEl.textContent = `${data.inference_time_ms.toFixed(2)} ms`;
+                metricsContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Prediction error:', error);
+                predictionStatus.textContent = 'Prediction Failed';
+                predictionStatus.className = 'mt-2 text-lg font-bold text-red-500';
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                resultsContainer.classList.remove('hidden');
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            populateDatasetDropdowns();
+            showPage('main-menu-page');
+        });
+    </script>
+</body>
+</html>

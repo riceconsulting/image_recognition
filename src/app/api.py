@@ -5,35 +5,28 @@ import io
 from . import controller
 from typing import Literal
 
-# Create a new router object
 router = APIRouter()
-
-@router.get("/")
-def read_root():
-    return {"message": "Welcome to the Defect Detection API."}
 
 @router.post("/predict/")
 async def predict(
     image_file: UploadFile = File(..., description="The image to analyze."),
-    model_arch: Literal['unet', 'deeplabv3plus'] = Query('unet', description="The model architecture to use for prediction.")
+    model_arch: Literal['unet', 'deeplabv3plus'] = Query('unet', description="The model architecture to use."),
+    dataset_name: str = Query(..., description="The dataset the model was trained on (e.g., 'bottle').")
 ):
-    """
-    Prediction endpoint. Receives an image and a model choice, returns the analysis.
-    """
     contents = await image_file.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
-    
-    prediction = controller.analyze_image(image, model_architecture=model_arch)
-    
+    prediction = controller.analyze_image(image, model_architecture=model_arch, dataset_name=dataset_name)
     return prediction
 
 @router.post("/train/")
 async def train(
-    background_tasks: BackgroundTasks,
-    model_arch: Literal['unet', 'deeplabv3plus'] = Query('unet', description="The model architecture to train.")
+    model_arch: Literal['unet', 'deeplabv3plus'] = Query('unet', description="The model architecture to train."),
+    dataset_name: str = Query(..., description="The dataset to train the model on (e.g., 'bottle').")
 ):
     """
-    Training endpoint. Triggers the training process for a specific model in the background.
+    Training endpoint that now runs synchronously and returns training history.
     """
-    background_tasks.add_task(controller.start_model_training, model_architecture=model_arch)
-    return {"message": f"Model training for '{model_arch}' started in the background."}
+    # Note: For long training jobs, a background task is better, but for this UI,
+    # a synchronous response is needed to get the history back.
+    response_data = controller.start_model_training(model_architecture=model_arch, dataset_name=dataset_name)
+    return response_data
