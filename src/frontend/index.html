@@ -28,16 +28,42 @@
 
         <!-- Main Menu Page -->
         <div id="main-menu-page" class="page active">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div id="go-to-train" class="nav-card bg-gray-800 p-8 rounded-lg shadow-2xl text-center cursor-pointer">
                     <h2 class="text-3xl font-bold text-white mb-4">Train Model</h2>
-                    <p class="text-gray-400">Train a new segmentation model on a selected dataset.</p>
+                    <p class="text-gray-400">Train a model on an existing dataset.</p>
                 </div>
                 <div id="go-to-predict" class="nav-card bg-gray-800 p-8 rounded-lg shadow-2xl text-center cursor-pointer">
                     <h2 class="text-3xl font-bold text-white mb-4">Predict Defects</h2>
-                    <p class="text-gray-400">Upload an image to find defects using a trained model.</p>
+                    <p class="text-gray-400">Find defects in an image using a trained model.</p>
+                </div>
+                <div id="go-to-dashboard" class="nav-card bg-gray-800 p-8 rounded-lg shadow-2xl text-center cursor-pointer">
+                    <h2 class="text-3xl font-bold text-white mb-4">Dashboard</h2>
+                    <p class="text-gray-400">View a summary of detected defects.</p>
                 </div>
             </div>
+        </div>
+
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page">
+            <main class="bg-gray-800 p-6 rounded-lg shadow-2xl">
+                <button class="back-btn mb-6 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">&larr; Back to Menu</button>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-2xl font-semibold text-white">Prediction Dashboard</h3>
+                    <select id="dashboard-dataset-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5"></select>
+                </div>
+                <div id="dashboard-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <h4 class="text-lg font-semibold mb-2 text-center">Defect Type Distribution</h4>
+                        <canvas id="defect-chart"></canvas>
+                    </div>
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <h4 class="text-lg font-semibold mb-2 text-center">Recent Prediction History</h4>
+                        <div id="prediction-history" class="space-y-3 max-h-96 overflow-y-auto"></div>
+                    </div>
+                </div>
+                <div id="dashboard-status" class="mt-4 text-center text-gray-500"></div>
+            </main>
         </div>
 
         <!-- Training Page -->
@@ -92,22 +118,22 @@
                     <div class="text-center">
                         <h3 class="text-xl font-semibold mb-2 text-white">Prediction Result</h3>
                         <img id="predicted-image" src="" alt="Prediction" class="result-image mx-auto">
-                        <p id="prediction-status" class="mt-2 text-lg font-medium"></p>
                     </div>
                 </div>
-
-                <!-- Metrics Display -->
-                <div id="metrics-container" class="mt-4 bg-gray-700 p-4 rounded-lg grid grid-cols-1 sm:grid-cols-2 gap-4 hidden">
-                    <div class="text-center">
-                        <h4 class="text-md font-semibold text-gray-400">Confidence Score</h4>
-                        <p id="confidence-score" class="text-2xl font-bold text-white">-</p>
+                <div id="metrics-container" class="mt-4 bg-gray-700 p-4 rounded-lg hidden">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <h4 class="text-md font-semibold text-gray-400">Inference Time</h4>
+                            <p id="inference-time" class="text-2xl font-bold text-white">-</p>
+                        </div>
+                        <div class="text-center">
+                            <h4 class="text-md font-semibold text-gray-400">Defect Status</h4>
+                            <p id="prediction-status" class="text-2xl font-bold">-</p>
+                        </div>
                     </div>
-                    <div class="text-center">
-                        <h4 class="text-md font-semibold text-gray-400">Inference Time</h4>
-                        <p id="inference-time" class="text-2xl font-bold text-white">-</p>
-                    </div>
+                    <div id="defect-details" class="mt-4 border-t border-gray-600 pt-4"></div>
+                    <div id="color-legend" class="mt-4 border-t border-gray-600 pt-4"></div>
                 </div>
-                
                 <div id="loading-spinner" class="text-center py-12 hidden">
                     <svg class="animate-spin h-10 w-10 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     <p class="mt-4 text-lg text-gray-400">Processing image...</p>
@@ -129,18 +155,103 @@
         const headerSubtitle = document.getElementById('header-subtitle');
         const goToTrainBtn = document.getElementById('go-to-train');
         const goToPredictBtn = document.getElementById('go-to-predict');
+        const goToDashboardBtn = document.getElementById('go-to-dashboard');
         const backBtns = document.querySelectorAll('.back-btn');
         let trainingChart = null;
+        let defectChart = null;
 
         function showPage(pageId) {
             pages.forEach(page => page.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
-            headerSubtitle.textContent = pageId.replace('-page', '').replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            headerSubtitle.textContent = pageId.replace('-page', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            
+            if (pageId === 'dashboard-page') {
+                const selectedDataset = document.getElementById('dashboard-dataset-select').value;
+                if(selectedDataset) loadDashboardData(selectedDataset);
+            }
         }
         goToTrainBtn.addEventListener('click', () => showPage('train-page'));
         goToPredictBtn.addEventListener('click', () => showPage('predict-page'));
+        goToDashboardBtn.addEventListener('click', () => showPage('dashboard-page'));
         backBtns.forEach(btn => btn.addEventListener('click', () => showPage('main-menu-page')));
 
+        // --- Dashboard Page Logic ---
+        const dashboardStatus = document.getElementById('dashboard-status');
+        const dashboardDatasetSelect = document.getElementById('dashboard-dataset-select');
+        const predictionHistoryEl = document.getElementById('prediction-history');
+        
+        dashboardDatasetSelect.addEventListener('change', (e) => loadDashboardData(e.target.value));
+
+        async function loadDashboardData(datasetName) {
+            dashboardStatus.textContent = 'Loading dashboard data...';
+            if (defectChart) defectChart.destroy();
+            predictionHistoryEl.innerHTML = '';
+
+            try {
+                const response = await fetch(`/prediction-log/${datasetName}`);
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || 'Failed to load log data.');
+                
+                if (data.summary.labels && data.summary.labels.length > 0) {
+                    dashboardStatus.textContent = '';
+                    renderDefectChart(data.summary.labels, data.summary.data);
+                } else {
+                    dashboardStatus.textContent = 'No prediction data has been logged for this dataset yet.';
+                }
+
+                if (data.history && data.history.length > 0) {
+                    renderPredictionHistory(data.history);
+                }
+
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                dashboardStatus.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        function renderDefectChart(labels, data) {
+            const ctx = document.getElementById('defect-chart').getContext('2d');
+            defectChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels.map(l => l.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())),
+                    datasets: [{
+                        label: 'Detections',
+                        data: data,
+                        backgroundColor: ['#EF4444', '#F97316', '#EAB308', '#84CC16', '#22C55E', '#10B981'],
+                        hoverOffset: 4
+                    }]
+                }
+            });
+        }
+
+        function renderPredictionHistory(history) {
+            history.reverse().forEach(log => {
+                const entry = document.createElement('div');
+                entry.className = 'flex items-center gap-4 bg-gray-800 p-2 rounded-lg';
+                
+                const defects = log.defects_found;
+                const hasDefects = Object.keys(defects).length > 0;
+                let defectText = 'No Defects';
+                if (hasDefects) {
+                    defectText = Object.keys(defects).map(d => d.replace('_', ' ')).join(', ');
+                }
+
+                const date = new Date(log.timestamp).toLocaleString();
+
+                entry.innerHTML = `
+                    <img src="data:image/png;base64,${log.thumbnail_b64}" class="w-12 h-12 rounded-md">
+                    <div class="flex-1">
+                        <p class="font-semibold ${hasDefects ? 'text-red-400' : 'text-green-400'}">${defectText}</p>
+                        <p class="text-xs text-gray-400">${date}</p>
+                    </div>
+                    <div class="text-sm text-gray-300">${log.inference_time_ms.toFixed(2)} ms</div>
+                `;
+                predictionHistoryEl.appendChild(entry);
+            });
+        }
+        
         // --- Training Page Logic ---
         const trainBtn = document.getElementById('train-btn');
         const trainModelSelect = document.getElementById('train-model-select');
@@ -148,13 +259,11 @@
         const trainingOutput = document.getElementById('training-output');
         const predictDatasetSelect = document.getElementById('predict-dataset-select');
 
-        async function populateDatasetDropdowns() {
+        async function populateDatasetDropdowns(selectors) {
             try {
                 const response = await fetch('/datasets');
                 const data = await response.json();
-                const datasetSelectors = [trainDatasetSelect, predictDatasetSelect];
-                
-                datasetSelectors.forEach(selector => {
+                selectors.forEach(selector => {
                     selector.innerHTML = '';
                     if (data.datasets && data.datasets.length > 0) {
                         data.datasets.forEach(dataset => {
@@ -172,7 +281,7 @@
                 }
             } catch (error) {
                 console.error('Error fetching datasets:', error);
-                [trainDatasetSelect, predictDatasetSelect].forEach(s => s.innerHTML = '<option disabled>Error</option>');
+                selectors.forEach(s => s.innerHTML = '<option disabled>Error</option>');
             }
         }
 
@@ -207,7 +316,7 @@
                         <p class="text-3xl font-bold text-white">${history.total_epochs}</p>
                     </div>
                     <div class="bg-gray-700 p-4 rounded-lg text-center">
-                        <h4 class="text-lg font-semibold text-gray-400">Best Val Dice Score</h4>
+                        <h4 class="text-lg font-semibold text-gray-400">Best Val mIoU</h4>
                         <p class="text-3xl font-bold text-green-400">${history.best_val_score.toFixed(4)}</p>
                     </div>
                      <div class="bg-gray-700 p-4 rounded-lg text-center">
@@ -230,14 +339,12 @@
                             label: 'Training Loss',
                             data: history.train_loss,
                             borderColor: 'rgb(59, 130, 246)',
-                            backgroundColor: 'rgba(59, 130, 246, 0.5)',
                             yAxisID: 'y',
                         },
                         {
-                            label: 'Validation Dice Score',
-                            data: history.val_dice,
+                            label: 'Validation mIoU',
+                            data: history.val_miou,
                             borderColor: 'rgb(16, 185, 129)',
-                            backgroundColor: 'rgba(16, 185, 129, 0.5)',
                             yAxisID: 'y1',
                         }
                     ]
@@ -247,7 +354,7 @@
                     interaction: { mode: 'index', intersect: false },
                     scales: {
                         y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Loss' } },
-                        y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Dice Score' }, grid: { drawOnChartArea: false } }
+                        y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'mIoU Score' }, grid: { drawOnChartArea: false } }
                     }
                 }
             });
@@ -265,9 +372,20 @@
         const placeholder = document.getElementById('placeholder');
         const exampleGallery = document.getElementById('example-gallery');
         const metricsContainer = document.getElementById('metrics-container');
-        const confidenceScoreEl = document.getElementById('confidence-score');
         const inferenceTimeEl = document.getElementById('inference-time');
+        const defectDetailsEl = document.getElementById('defect-details');
+        const colorLegendEl = document.getElementById('color-legend');
         let selectedFile = null;
+
+        const COLOR_MAP = {
+            "contamination": "rgb(0, 0, 255)",
+            "broken_large": "rgb(255, 0, 0)",
+            "broken_small": "rgb(0, 255, 0)",
+        };
+
+        function titleCase(str) {
+            return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        }
         
         predictDatasetSelect.addEventListener('change', (event) => {
             updateExampleImages(event.target.value);
@@ -298,7 +416,7 @@
                         exampleGallery.appendChild(container);
                     });
                 } else {
-                    exampleGallery.innerHTML = '<p class="text-gray-500 col-span-full text-center">No examples found for this dataset.</p>';
+                    exampleGallery.innerHTML = '<p class="text-gray-500 col-span-full text-center">No examples found.</p>';
                 }
             } catch (error) {
                 console.error('Error fetching example images:', error);
@@ -355,18 +473,52 @@
                 const data = await response.json();
                 
                 predictedImage.src = `data:image/png;base64,${data.overlay_image_b64}`;
-                predictionStatus.textContent = data.defect_detected ? 'Defect Detected!' : 'No Defect Detected';
-                predictionStatus.className = `mt-2 text-lg font-bold ${data.defect_detected ? 'text-red-400' : 'text-green-400'}`;
+                
+                const defects = data.defects_found;
+                const hasDefects = Object.keys(defects).length > 0;
 
-                // Update metrics
-                confidenceScoreEl.textContent = data.defect_detected ? `${(data.confidence * 100).toFixed(2)}%` : '-';
+                predictionStatus.textContent = hasDefects ? 'Defect(s) Detected!' : 'No Defects Detected';
+                predictionStatus.className = `text-2xl font-bold ${hasDefects ? 'text-red-400' : 'text-green-400'}`;
+                
                 inferenceTimeEl.textContent = `${data.inference_time_ms.toFixed(2)} ms`;
+                
+                defectDetailsEl.innerHTML = '';
+                colorLegendEl.innerHTML = '';
+
+                if (hasDefects) {
+                    const list = document.createElement('ul');
+                    list.className = 'space-y-2 text-left';
+                    const legendContainer = document.createElement('div');
+                    legendContainer.className = 'flex flex-wrap gap-4 justify-center items-center mt-2';
+
+                    for (const [className, details] of Object.entries(defects)) {
+                        const listItem = document.createElement('li');
+                        listItem.className = 'flex justify-between items-center bg-gray-800 p-2 rounded';
+                        listItem.innerHTML = `
+                            <span class="font-semibold text-white">${titleCase(className.replace('_', ' '))}</span>
+                            <span class="text-gray-400">${details.area_percentage.toFixed(2)}%</span>
+                        `;
+                        list.appendChild(listItem);
+
+                        const color = COLOR_MAP[className] || 'rgb(128, 128, 128)';
+                        const legendItem = document.createElement('div');
+                        legendItem.className = 'flex items-center gap-2';
+                        legendItem.innerHTML = `<div class="w-4 h-4 rounded" style="background-color: ${color};"></div><span>${titleCase(className.replace('_', ' '))}</span>`;
+                        legendContainer.appendChild(legendItem);
+                    }
+                    defectDetailsEl.appendChild(list);
+                    colorLegendEl.appendChild(legendContainer);
+                } else {
+                    defectDetailsEl.innerHTML = '<p class="text-gray-500">No specific defects were found.</p>';
+                }
+                
                 metricsContainer.classList.remove('hidden');
 
             } catch (error) {
                 console.error('Prediction error:', error);
                 predictionStatus.textContent = 'Prediction Failed';
-                predictionStatus.className = 'mt-2 text-lg font-bold text-red-500';
+                predictionStatus.className = 'text-2xl font-bold text-red-500';
+                metricsContainer.classList.remove('hidden');
             } finally {
                 loadingSpinner.classList.add('hidden');
                 resultsContainer.classList.remove('hidden');
@@ -374,7 +526,8 @@
         }
         
         document.addEventListener('DOMContentLoaded', () => {
-            populateDatasetDropdowns();
+            const allDatasetSelects = document.querySelectorAll('select[id$="-dataset-select"]');
+            populateDatasetDropdowns(Array.from(allDatasetSelects));
             showPage('main-menu-page');
         });
     </script>

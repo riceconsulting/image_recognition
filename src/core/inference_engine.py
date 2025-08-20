@@ -11,11 +11,12 @@ import sys
 sys.path.insert(0, project_root)
 
 from src.models.build_model import build_model
-from src.core.post_processing import process_segmentation_output, overlay_mask_on_image
+from src.core.post_processing import process_multiclass_segmentation_output, overlay_multiclass_mask_on_image
 
 class InferenceEngine:
     def __init__(self, model_path, config):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.config = config
         self.model = build_model(config['model_config'])
         
         print(f"Loading model from: {model_path}")
@@ -29,41 +30,62 @@ class InferenceEngine:
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
+        # --- FIX: Perform a warm-up run ---
+        self._warmup()
+
+    def _warmup(self):
+        """
+        Performs a single dummy inference to warm up the model, GPU, and any
+        JIT compilers. This ensures the first real prediction has an accurate time.
+        """
+        print("Warming up the inference engine...")
+        # Create a dummy tensor with the expected input shape [batch, channels, height, width]
+        dummy_input = torch.randn(1, 3, 256, 256, device=self.device)
+        with torch.no_grad():
+            self.model(dummy_input)
+        print("Warm-up complete.")
+
     def predict(self, image: Image.Image):
         original_image = image.copy()
         image_tensor = self.transform(original_image).unsqueeze(0).to(self.device)
         
-        # --- 1. Measure Inference Speed ---
+        # Now the timing for the first prediction will be accurate
         start_time = time.perf_counter()
         with torch.no_grad():
             output = self.model(image_tensor)
         end_time = time.perf_counter()
         inference_time_ms = (end_time - start_time) * 1000
 
-        if isinstance(output, dict):
-            output = output['out']
+        if isinstance(output, dict): output = output['out']
             
-        # --- 2. Calculate Confidence Score ---
-        probabilities = torch.sigmoid(output)
-        binary_mask_tensor = (probabilities > 0.5)
+        pred_mask = process_multiclass_segmentation_output(output)
         
-        # Calculate confidence only for the pixels predicted as defects
-        defect_pixels = probabilities[binary_mask_tensor]
-        confidence_score = defect_pixels.mean().item() if len(defect_pixels) > 0 else 0.0
-
-        # Convert to numpy for post-processing
-        binary_mask = binary_mask_tensor.cpu().numpy().squeeze().astype(np.uint8)
+        detected_defects = {}
+        idx_to_class = {v: k for k, v in self.config.get('class_map', {}).items()}
         
-        defect_detected = bool(np.sum(binary_mask) > 0)
+        # --- FIX: Calculate total pixels for percentage calculation ---
+        total_pixels = pred_mask.shape[0] * pred_mask.shape[1]
         
-        overlayed_image = overlay_mask_on_image(original_image, binary_mask)
+        unique_classes = np.unique(pred_mask)
+        for class_idx in unique_classes:
+            if class_idx == 0: continue
+            
+            class_name = idx_to_class.get(class_idx, f"Unknown_{class_idx}")
+            pixel_count = np.sum(pred_mask == class_idx)
+            
+            # --- FIX: Calculate area percentage ---
+            area_percentage = (pixel_count / total_pixels) * 100
+            
+            # --- FIX: Add area_percentage to the response dictionary ---
+            detected_defects[class_name] = { 
+                "area_pixels": int(pixel_count),
+                "area_percentage": area_percentage
+            }
+            
+        overlayed_image = overlay_multiclass_mask_on_image(original_image, pred_mask)
         
         return {
-            "defect_detected": defect_detected,
+            "defects_found": detected_defects,
             "overlay_image": overlayed_image,
-            "confidence": confidence_score,
             "inference_time_ms": inference_time_ms,
-            # Note: Metrics like IoU/Dice require a ground truth mask,
-            # which is not available during live prediction.
-            # They are calculated in the evaluate.py script.
         }
