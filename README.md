@@ -1,171 +1,130 @@
-# 🧠 Industrial Defect Detection using Segmentation
+# 🧠 Industrial Defect Detection with Web UI
 
-This project provides an end-to-end solution for **industrial defect detection** using advanced segmentation models.  
-It is served via a **FastAPI** backend, packaged and deployed using **Docker**.
+This project provides an end-to-end solution for industrial defect detection using advanced segmentation models. It features a user-friendly web interface for training models, running predictions, and visualizing results. The backend is built with **FastAPI** and the entire application is containerized with **Docker**.
+
+---
+
+## ✨ Features
+
+-   **Interactive Web Interface**: A multi-page UI for all major operations.
+-   **Multiple Model Support**: Train and predict with different segmentation architectures like **U-Net** and **DeepLabV3+**.
+-   **Multiple Dataset Support**: Easily switch between different datasets for training and prediction.
+-   **Real-time Prediction**: Upload an image to get a visual segmentation mask, a list of detected defects, and performance metrics.
+-   **Live Training Dashboard**: Start the training process from the UI and monitor progress with a real-time chart showing loss and validation scores.
+-   **Prediction Dashboard**: View a summary of historical predictions for each dataset, including a defect distribution chart and a log of recent predictions.
 
 ---
 
 ## 🚀 Getting Started
 
-Follow these steps to prepare the dataset, build the Docker image, and run the API.
+Follow these steps to prepare the dataset, build the Docker image, and run the application.
 
----
+### 1. 📁 Dataset Setup
 
-## 1. 📁 Dataset Setup
-
-This project used data from MVTEC AD Dataset, you can download it on the link below
+This project is configured to use datasets like the **MVTec AD (Anomaly Detection)** dataset. This project used data from MVTEC AD Dataset, you can download it on the link below
 - **Dataset**: [MVTec AD Dataset](https://www.mvtec.com/company/research/datasets/mvtec-ad)  
-- **Category used**: `bottle`
 
-### 📂 Required Folder Structure
+-   **Prepare Your Data**: Place your dataset folders (e.g., `bottle`, `tile`) inside the `data/processed/` directory. Each dataset folder must contain `train` and `test` subdirectories, which in turn contain folders for each class (e.g., `good`, `contamination`). A `ground_truth` folder with binary masks is also required.
 
-The application expects the following folder structure inside the `data/processed/` directory:
+    ```
+    data/
+    └── processed/
+        └── bottle/
+            ├── train/
+            │   └── good/
+            ├── test/
+            │   ├── good/
+            │   ├── contamination/
+            └── ground_truth/
+                └── contamination/
+    ```
 
-```
-data/
-└── processed/
-    └── bottle/
-        ├── train/
-        │   └── good/
-        ├── test/
-        │   ├── good/
-        │   ├── contamination/
-        └── ground_truth/
-            └── contamination/
-```
+-   **Preprocess Masks (Crucial Step)**: Before training a multi-class model, you must convert your binary ground truth masks into a multi-class format. Run the provided preprocessing script from your terminal. It will automatically find all your datasets and process them.
 
-## ✨ Suitable Images & Capture Conditions
+    ```bash
+    python src/data/preprocess_masks.py
+    ```
 
-For optimal performance, the quality and consistency of the input images are critical. To achieve the best results, your images should adhere to the following guidelines:
+    This will create a `labels.json` file and a `ground_truth_multiclass` folder inside each dataset directory.
 
-- **Lighting:** Use consistent and diffuse lighting. For transparent objects like bottles, backlighting is highly effective.  
-- **Resolution:** Capture high-resolution images (e.g., >1 Megapixel) to ensure small defects are visible.  
-- **Focus:** The entire object surface should be in sharp and consistent focus.  
-- **Positioning:** Keep the object in a fixed and repeatable position and orientation in every shot.  
-- **File Format:** Use lossless formats like `.png` or `.bmp` to avoid compression artifacts.  
+### 2. 🐳 Docker Deployment
 
+-   **Build the Docker Image**: From the project's root directory, run:
 
----
+    ```bash
+    docker build -t defect-detector-app -f deployment/Dockerfile .
+    ```
 
-## 2. 🤖 Available Models
+-   **Run the Docker Container**:
+    -   **For CPU**: The `--shm-size` flag is critical to prevent training errors.
+        ```bash
+        docker run -p 8000:8000 --shm-size="512m" --name defect-detector-instance defect-detector-app
+        ```
+    -   **For GPU (Recommended)**: You must have the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed.
+        ```bash
+        docker run -p 8000:8000 --shm-size="2g" --gpus all --name defect-detector-instance defect-detector-app
+        ```
 
-This repository includes **two segmentation models**.  
-You can choose which one to train and use via the API.
-
-| Model       | Architecture   | Best For | Notes |
-|-------------|----------------|----------|-------|
-| **U-Net**   | `unet`         | General purpose, good balance of speed and accuracy | A classic and reliable choice for semantic segmentation |
-| **DeepLabV3+** | `deeplabv3plus` | High accuracy, especially with complex defect shapes | Uses a ResNet backbone and is more computationally intensive |
-
-> 💡 Other segmentation architectures like **FCN**, **Mask R-CNN**, or **SegNet** could also be integrated into this framework.
-
----
-
-## 3. 🐳 Docker Deployment
-
-### 🔨 Build the Docker Image
-
-From the root project directory:
-
-```bash
-docker build -t defect-detector-app -f deployment/Dockerfile .
-```
-
-### 🚀 Run the Docker Container
-
-```bash
-docker run -p 8000:8000 --shm-size="2g" --gpus all --name image-recognition defect-detector-app
-```
-
-Or run it using **Docker Desktop** by navigating to the **Images** tab, selecting `defect-detector-app`, clicking **Run**, and publishing port `8000`.
-
-Once running, the API is accessible at:  
-👉 `http://127.0.0.1:8000`
+Once running, the application is accessible at 👉 `http://127.0.0.1:8000`
 
 ---
 
-## ⚙️ API Endpoints
+## ⚙️ Application Usage
 
-The API allows you to **select which model** to use for training and prediction via a query parameter.
+The web interface is the primary way to interact with the application.
 
----
+### Main Menu
 
-### 🔁 `/train`
+From the main menu, you can navigate to one of three pages:
 
-- **Purpose**: Trains the specified segmentation model  
-- **Method**: `POST`  
-- **URL**: `http://127.0.0.1:8000/train`  
-- **Query Parameter**: `model_arch` (either `unet` or `deeplabv3plus`)
+### 1. Train Model Page
 
----
+Here you can train a new model.
 
-### 🔍 `/predict`
+-   **Select Model**: Choose between `U-Net` and `DeepLabV3+`.
+-   **Select Dataset**: Choose the dataset you want to train on from the dropdown.
+-   **Start Training**: Click the button to begin the training process. The UI will display a chart showing the training loss and validation score (mIoU) for each epoch.
 
-- **Purpose**: Detects defects in an uploaded image using the specified model  
-- **Method**: `POST`  
-- **URL**: `http://127.0.0.1:8000/predict`  
-- **Query Parameter**: `model_arch` (either `unet` or `deeplabv3plus`)  
-- **Body**: `multipart/form-data` with a key `file` containing the image to analyze
+![alt text](image-1.png)
 
----
+### 2. Predict Defects Page
 
-## 🧪 Sample API Requests
+This page allows you to use a trained model to find defects.
 
-### Train a specific model
+-   **Select Model & Dataset**: Choose the model architecture and the dataset it was trained on.
+-   **Upload Image**: Upload an image from your computer.
+-   **View Results**: The UI will display the original image alongside the prediction, which shows a colored mask overlaid on any detected defects. Below the images, you will see:
+    -   **Inference Time**: The time taken for the prediction in milliseconds.
+    -   **Defect Status**: A summary of whether defects were found.
+    -   **Defect Details**: A list of each classified defect and its quantified area.
+    -   **Color Legend**: An explanation of what each color in the mask represents.
 
-```bash
-curl -X POST "http://127.0.0.1:8000/train?model_arch=<model_name>"
-```
-> **Note:** Replace `<model_name>` with either `unet` or `deeplabv3plus`.
----
+![alt text](image-2.png)
 
-### Predict with a specific model
+### 3. Dashboard Page
 
-```bash
-# Predict using the U-Net model
-curl -X POST "http://127.0.0.1:8000/predict?model_arch=<model_name>" \
-     -F "image_file=@/path/to/your/image.png"
-```
-> **Note:** Replace `<model_name>` with either `unet` or `deeplabv3plus`.
+This page provides a high-level overview of the prediction history.
 
+-   **Select Dataset**: Choose a dataset to view its specific statistics.
+-   **Defect Distribution**: A chart shows the total count of each defect type that has been detected over time.
+-   **Recent Prediction History**: A log displays the most recent predictions, including a thumbnail of the image, the detected defects, and the timestamp.
 
-## ⚠️ Training Notice
-
-You must have a trained model before using `/predict`. You have two options:
-
-### ✅ Option 1: Train via API (Recommended)
-- After starting the container, call the `/train` endpoint.  
-- The model will be trained inside the container.
-
-### 🖥️ Option 2: Train Locally (Easy for Docker Rebuild)
-
-You can train either the **U-Net** or **DeepLabV3+** model locally **without starting the API server**.  
-The process is controlled by the `config/config.yaml` file.
+![alt text](image-3.png)
 
 ---
 
-#### **Step 1: Choose the Model to Train**
+### 🖥️ Alternative: Local Training
 
-Open the `config/config.yaml` file and find the `active_model_architecture` key.
+You can also train a model locally without using the UI. This is useful for pre-training models before building your Docker image.
 
-Set the value to either:
+1.  **Configure**: Open the `config/config.yaml` file.
+2.  **Set Model**: Change the `active_model_architecture` to `unet` or `deeplabv3plus`.
+3.  **Set Dataset**: Change the `product_name` to the dataset you want to train on (e.g., `bottle`).
+4.  **Run**: Execute the training script from your terminal:
+    ```bash
+    python src/train.py
+    ```
 
-- `"unet"` or `"deeplabv3plus"`  
+This will generate the model file in the `models/final/` directory. When you build the Docker image, this pre-trained model will be included.
 
-Example:
-
-```yaml
-active_model_architecture: "unet"  # or "deeplabv3plus"
-```
-#### **Step 2: Run the training script**
-
-- Before building the Docker image, run:
-```bash
-python src/train.py
-```
-This will generate `models/final/best_<model_name>_model.pth`  
-*(e.g., `best_unet_model.pth` or `best_deeplabv3_model.pth` depending on the model used).*  
-
-When you build the Docker image afterward, it will include this model,  
-allowing you to immediately use `/predict`.
-
+---

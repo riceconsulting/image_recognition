@@ -1,0 +1,21 @@
+# Ignore Git and VS Code files
+.git
+.gitignore
+.vscode/
+
+# Ignore Python cache and environment files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+
+# Ignore large data and model directories
+data/
+models/
+
+# Ignore development and testing files
+notebooks/
+tests/
+README.md
